@@ -16,59 +16,24 @@ interface AnalysisResponse {
     brightness: number;
     style_tags: string[];
   };
+  artworks: {
+    matching: ArtworkSuggestionResponse[];
+    contrast: ArtworkSuggestionResponse[];
+  }
+  reasoning: string;
 }
-
-// Dummy suggestions data
-const dummySuggestions = [
-  {
-    id: 1,
-    name: "Modern Canvas Art",
-    price: "$129.99",
-    location: "Living Room",
-    image: "https://images.unsplash.com/photo-1513519245088-0e12902e35ca?w=500",
-    link: "#",
-  },
-  {
-    id: 2,
-    name: "Minimalist Wall Clock",
-    price: "$49.99",
-    location: "Bedroom",
-    image: "https://images.unsplash.com/photo-1563298723-dcfebaa392e3?w=500",
-    link: "#",
-  },
-  {
-    id: 3,
-    name: "Decorative Plant Pot",
-    price: "$34.99",
-    location: "Office",
-    image: "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=500",
-    link: "#",
-  },
-  {
-    id: 4,
-    name: "Abstract Wall Art",
-    price: "$89.99",
-    location: "Dining Room",
-    image: "https://images.unsplash.com/photo-1547826039-bfc35e0f1ea8?w=500",
-    link: "#",
-  },
-  {
-    id: 5,
-    name: "Vintage Table Lamp",
-    price: "$79.99",
-    location: "Study Room",
-    image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=500",
-    link: "#",
-  },
-  {
-    id: 6,
-    name: "Ceramic Vase Set",
-    price: "$59.99",
-    location: "Hallway",
-    image: "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=500",
-    link: "#",
-  },
-];
+interface ArtworkSuggestionResponse {
+  id: number;
+  title: string;
+  brand: string;
+  price: string;
+  style_tags: string;
+  dominant_palette: string;
+  image_url: string;
+  brightness: number;
+  height: number;
+  width: number;
+}
 
 export default function Home() {
   const [selectedInput, setSelectedInput] = useState<InputType>("photo");
@@ -136,14 +101,15 @@ export default function Home() {
     setIsLoadingSuggestions(false);
 
     try {
-      const response = await fetch("/api/room/analyze", {
+      const formData = new FormData();
+      formData.append("file", selectedInput);
+
+      const response = await fetch("http://localhost:8000/room/analyze", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "multipart/form-data",
         },
-        body: JSON.stringify({
-          inputType: selectedInput,
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -151,27 +117,17 @@ export default function Home() {
       }
 
       const data: AnalysisResponse = await response.json();
+
       setAnalysisResult(data);
+
       console.log("Analysis result:", data);
 
       // Scroll to results after getting the response
       setTimeout(() => {
         scrollToResults();
-      }, 300);
-
-      // Show suggestions loader after 1.5 seconds (giving time to see results)
-      setTimeout(() => {
-        setIsLoadingSuggestions(true);
-        // Scroll to loader section
-        setTimeout(() => {
-          smoothScrollTo(suggestionsLoaderRef.current, 1000);
-        }, 100);
-        // Show suggestions after 2 seconds
-        setTimeout(() => {
-          setIsLoadingSuggestions(false);
-          setShowSuggestions(true);
-        }, 2000);
-      }, 1500);
+        smoothScrollTo(suggestionsLoaderRef.current, 1000);
+        setShowSuggestions(true);
+      }, 150);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       console.error("Error:", err);
@@ -248,7 +204,7 @@ export default function Home() {
         {/* Input Section */}
         <section
           ref={inputSectionRef}
-          className="min-h-screen flex items-center justify-center px-4 py-16"
+          className="min-h-screen flex items-center justify-center px-5"
         >
           <div className="container mx-auto max-w-7xl">
             {/* Input Method Selection & Input Component */}
@@ -351,7 +307,7 @@ export default function Home() {
         {analysisResult && (
           <section
             ref={resultsSectionRef}
-            className="min-h-screen flex items-center justify-center px-4 py-16"
+            className="min-h-screen flex items-center justify-center px-4 py-5"
           >
             <div className="container mx-auto max-w-7xl">
               <div className="max-w-5xl mx-auto">
@@ -453,7 +409,7 @@ export default function Home() {
         {analysisResult && isLoadingSuggestions && (
           <section
             ref={suggestionsLoaderRef}
-            className="min-h-[300px] flex items-center justify-center py-16"
+            className="min-h-[300px] flex items-center justify-center py-5"
           >
             <div className="text-center">
               <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
@@ -466,18 +422,18 @@ export default function Home() {
 
         {/* Suggestions Section */}
         {analysisResult && showSuggestions && (
-          <section className="min-h-screen flex items-start justify-center py-12">
+          <section className="min-h-screen flex items-start justify-center py-1">
             <div className="container mx-auto max-w-7xl px-4">
               <div className="rounded-xl shadow-2xl p-6 md:p-8 ">
                 <h3 className="text-3xl font-bold mb-8 text-white drop-shadow-lg">
-                  Suggested Artwork
+                  Matching Suggested Artwork
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                  {dummySuggestions.map((item, index) => (
+                  {analysisResult.artworks?.matching?.map((item, index) => (
                     <a
                       key={item.id}
-                      href={item.link}
+                      href={item.image_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="group block bg-white rounded-2xl overflow-hidden shadow-lg transform transition-all duration-500 hover:scale-105 hover:shadow-2xl animate-fadeInUp"
@@ -488,7 +444,7 @@ export default function Home() {
                       <div
                         className="relative h-80 bg-cover bg-center rounded-2xl"
                         style={{
-                          backgroundImage: `url(${item.image})`,
+                          backgroundImage: `url(${item.image_url})`,
                         }}
                       >
                         {/* Semi-transparent overlay */}
@@ -496,11 +452,54 @@ export default function Home() {
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <h4 className="text-white font-semibold text-lg mb-1">
-                                {item.name}
+                                {item.title} by {item.brand}
                               </h4>
-                              <p className="text-gray-300 text-sm">
-                                {item.location}
-                              </p>
+                            </div>
+                            <div className="text-white font-bold text-lg ml-2">
+                              {item.price}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="h-10 d-block"></div>
+
+            <div className="container mx-auto max-w-7xl px-4">
+              <div className="rounded-xl shadow-2xl p-6 md:p-8 ">
+                <h3 className="text-3xl font-bold mb-8 text-white drop-shadow-lg">
+                  Contrast Suggested Artwork
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                  {analysisResult.artworks?.contrast?.map((item, index) => (
+                    <a
+                      key={item.id}
+                      href={item.image_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group block bg-white rounded-2xl overflow-hidden shadow-lg transform transition-all duration-500 hover:scale-105 hover:shadow-2xl animate-fadeInUp"
+                      style={{
+                        animationDelay: `${index * 100}ms`,
+                      }}
+                    >
+                      <div
+                        className="relative h-80 bg-cover bg-center rounded-2xl"
+                        style={{
+                          backgroundImage: `url(${item.image_url})`,
+                        }}
+                      >
+                        {/* Semi-transparent overlay */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/30 backdrop-blur-sm p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="text-white font-semibold text-lg mb-1">
+                                {item.title} by {item.brand}
+                              </h4>
                             </div>
                             <div className="text-white font-bold text-lg ml-2">
                               {item.price}
@@ -515,6 +514,21 @@ export default function Home() {
             </div>
           </section>
         )}
+
+        {analysisResult && (
+          <section className="min-h-screen flex items-start justify-center py-1">
+            <div className="container mx-auto max-w-7xl px-4">
+              <div className="rounded-xl shadow-2xl p-6 md:p-8 ">
+                <h3 className="text-3xl font-bold mb-8 text-white drop-shadow-lg">
+                  Why We Suggested These Artworks
+                </h3>
+                <p className="text-white text-lg">
+                  {analysisResult.reasoning}
+                </p>
+              </div>
+            </div>
+          </section>
+        )} 
 
         {/* Footer */}
         <div className="py-8 text-center text-gray-200 text-sm drop-shadow-md">
