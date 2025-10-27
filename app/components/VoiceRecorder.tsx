@@ -1,14 +1,72 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export default function VoiceRecorder() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioURL, setAudioURL] = useState<string>("");
   const [recordingTime, setRecordingTime] = useState(0);
+  const [transcript, setTranscript] = useState<string>("");
+  const [shouldAnalyze, setShouldAnalyze] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Check if browser supports Speech Recognition
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onresult = (event: any) => {
+        let interimTranscript = "";
+        let finalTranscript = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + " ";
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        if (finalTranscript) {
+          setTranscript((prev) => prev + finalTranscript);
+          console.log("Transcribed text:", finalTranscript);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+      };
+
+      recognitionRef.current = recognition;
+    } else {
+      console.warn("Speech Recognition API not supported in this browser");
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  // Watch transcript and shouldAnalyze - send to API when ready
+  useEffect(() => {
+    if (shouldAnalyze && transcript.trim()) {
+      analyzeTranscript(transcript);
+      setShouldAnalyze(false);
+    }
+  }, [transcript, shouldAnalyze]);
 
   const startRecording = async () => {
     try {
@@ -33,6 +91,13 @@ export default function VoiceRecorder() {
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
+      setTranscript("");
+      setShouldAnalyze(false);
+
+      // Start speech recognition
+      if (recognitionRef.current) {
+        recognitionRef.current.start();
+      }
 
       // Start timer
       timerRef.current = setInterval(() => {
@@ -44,6 +109,32 @@ export default function VoiceRecorder() {
     }
   };
 
+  const analyzeTranscript = async (text: string) => {
+    try {
+      console.log("Sending transcript to Python API:", text);
+
+      const response = await fetch("http://localhost:5001/api/analyze-text", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to analyze transcript");
+      }
+
+      const data = await response.json();
+      console.log("Analysis result from Python API:", data);
+
+      return data;
+    } catch (error) {
+      console.error("Error analyzing transcript:", error);
+      return null;
+    }
+  };
+
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
@@ -51,12 +142,21 @@ export default function VoiceRecorder() {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      // Stop speech recognition
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+
+      // Set flag to analyze transcript once it's fully updated
+      setShouldAnalyze(true);
     }
   };
 
   const deleteRecording = () => {
     setAudioURL("");
     setRecordingTime(0);
+    setTranscript("");
+    setShouldAnalyze(false);
   };
 
   const formatTime = (seconds: number) => {

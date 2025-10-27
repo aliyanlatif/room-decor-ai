@@ -18,6 +18,58 @@ interface AnalysisResponse {
   };
 }
 
+// Dummy suggestions data
+const dummySuggestions = [
+  {
+    id: 1,
+    name: "Modern Canvas Art",
+    price: "$129.99",
+    location: "Living Room",
+    image: "https://images.unsplash.com/photo-1513519245088-0e12902e35ca?w=500",
+    link: "#",
+  },
+  {
+    id: 2,
+    name: "Minimalist Wall Clock",
+    price: "$49.99",
+    location: "Bedroom",
+    image: "https://images.unsplash.com/photo-1563298723-dcfebaa392e3?w=500",
+    link: "#",
+  },
+  {
+    id: 3,
+    name: "Decorative Plant Pot",
+    price: "$34.99",
+    location: "Office",
+    image: "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=500",
+    link: "#",
+  },
+  {
+    id: 4,
+    name: "Abstract Wall Art",
+    price: "$89.99",
+    location: "Dining Room",
+    image: "https://images.unsplash.com/photo-1547826039-bfc35e0f1ea8?w=500",
+    link: "#",
+  },
+  {
+    id: 5,
+    name: "Vintage Table Lamp",
+    price: "$79.99",
+    location: "Study Room",
+    image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=500",
+    link: "#",
+  },
+  {
+    id: 6,
+    name: "Ceramic Vase Set",
+    price: "$59.99",
+    location: "Hallway",
+    image: "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=500",
+    link: "#",
+  },
+];
+
 export default function Home() {
   const [selectedInput, setSelectedInput] = useState<InputType>("photo");
   const [isLoading, setIsLoading] = useState(false);
@@ -25,9 +77,12 @@ export default function Home() {
     null
   );
   const [error, setError] = useState<string | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
 
   const inputSectionRef = useRef<HTMLDivElement>(null);
   const resultsSectionRef = useRef<HTMLDivElement>(null);
+  const suggestionsLoaderRef = useRef<HTMLDivElement>(null);
 
   const smoothScrollTo = (
     element: HTMLElement | null,
@@ -70,9 +125,15 @@ export default function Home() {
     smoothScrollTo(resultsSectionRef.current, 1200);
   };
 
+  const convertBrightnessToPercentage = (brightness: number) => {
+    return (brightness / 255) * 100;
+  };
+
   const handleGenerateIdeas = async () => {
     setIsLoading(true);
     setError(null);
+    setShowSuggestions(false);
+    setIsLoadingSuggestions(false);
 
     try {
       const response = await fetch("/api/room/analyze", {
@@ -97,6 +158,20 @@ export default function Home() {
       setTimeout(() => {
         scrollToResults();
       }, 300);
+
+      // Show suggestions loader after 1.5 seconds (giving time to see results)
+      setTimeout(() => {
+        setIsLoadingSuggestions(true);
+        // Scroll to loader section
+        setTimeout(() => {
+          smoothScrollTo(suggestionsLoaderRef.current, 1000);
+        }, 100);
+        // Show suggestions after 2 seconds
+        setTimeout(() => {
+          setIsLoadingSuggestions(false);
+          setShowSuggestions(true);
+        }, 2000);
+      }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       console.error("Error:", err);
@@ -301,19 +376,11 @@ export default function Home() {
                         </h4>
                         <div className="flex flex-wrap gap-3">
                           {analysisResult.analysis.wall_colors.map(
-                            (color, index) => (
+                            (color) => (
                               <div
-                                key={index}
-                                className="flex items-center gap-2"
-                              >
-                                <div
-                                  className="w-10 h-10 rounded-lg border-2 border-white shadow-md"
-                                  style={{ backgroundColor: color }}
-                                ></div>
-                                <span className="text-xs text-gray-800 font-mono font-medium">
-                                  {color}
-                                </span>
-                              </div>
+                                className="w-10 h-10 rounded-lg border-2 border-white shadow-md"
+                                style={{ backgroundColor: color }}
+                              ></div>
                             )
                           )}
                         </div>
@@ -361,16 +428,88 @@ export default function Home() {
                           <div
                             className="bg-gradient-to-r from-yellow-400 to-orange-500 h-5 rounded-full transition-all shadow-md"
                             style={{
-                              width: `${analysisResult.analysis.brightness}%`,
+                              width: `${convertBrightnessToPercentage(
+                                analysisResult.analysis.brightness
+                              )}%`,
                             }}
                           ></div>
                         </div>
                         <span className="text-gray-800 font-bold text-lg min-w-[60px]">
-                          {analysisResult.analysis.brightness.toFixed(1)}%
+                          {convertBrightnessToPercentage(
+                            analysisResult.analysis.brightness
+                          ).toFixed(1)}
+                          %
                         </span>
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Suggestions Loader */}
+        {analysisResult && isLoadingSuggestions && (
+          <section
+            ref={suggestionsLoaderRef}
+            className="min-h-[300px] flex items-center justify-center py-16"
+          >
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
+              <p className="text-white text-xl mt-6 drop-shadow-lg font-medium">
+                Loading Artwork Suggestions...
+              </p>
+            </div>
+          </section>
+        )}
+
+        {/* Suggestions Section */}
+        {analysisResult && showSuggestions && (
+          <section className="min-h-screen flex items-start justify-center py-12">
+            <div className="container mx-auto max-w-7xl px-4">
+              <div className="rounded-xl shadow-2xl p-6 md:p-8 ">
+                <h3 className="text-3xl font-bold mb-8 text-white drop-shadow-lg">
+                  Suggested Artwork
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                  {dummySuggestions.map((item, index) => (
+                    <a
+                      key={item.id}
+                      href={item.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group block bg-white rounded-2xl overflow-hidden shadow-lg transform transition-all duration-500 hover:scale-105 hover:shadow-2xl animate-fadeInUp"
+                      style={{
+                        animationDelay: `${index * 100}ms`,
+                      }}
+                    >
+                      <div
+                        className="relative h-80 bg-cover bg-center rounded-2xl"
+                        style={{
+                          backgroundImage: `url(${item.image})`,
+                        }}
+                      >
+                        {/* Semi-transparent overlay */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/30 backdrop-blur-sm p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="text-white font-semibold text-lg mb-1">
+                                {item.name}
+                              </h4>
+                              <p className="text-gray-300 text-sm">
+                                {item.location}
+                              </p>
+                            </div>
+                            <div className="text-white font-bold text-lg ml-2">
+                              {item.price}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  ))}
                 </div>
               </div>
             </div>
