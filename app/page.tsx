@@ -1,39 +1,16 @@
 "use client";
 
 import { useState, useRef } from "react";
-import Link from "next/link";
-import PhotoUpload from "./components/PhotoUpload";
-import VoiceRecorder from "./components/VoiceRecorder";
-import TextInput from "./components/TextInput";
-
-type InputType = "photo" | "voice" | "text";
-
-interface AnalysisResponse {
-  id: number;
-  url: string;
-  analysis: {
-    wall_colors: string[];
-    brightness: number;
-    style_tags: string[];
-  };
-  artworks: {
-    matching: ArtworkSuggestionResponse[];
-    contrast: ArtworkSuggestionResponse[];
-  }
-  reasoning: string;
-}
-interface ArtworkSuggestionResponse {
-  id: number;
-  title: string;
-  brand: string;
-  price: string;
-  style_tags: string;
-  dominant_palette: string;
-  image_url: string;
-  brightness: number;
-  height: number;
-  width: number;
-}
+import { InputType, AnalysisResponse } from "@/types";
+import { ANIMATION } from "@/constants";
+import { smoothScrollTo } from "@/lib/utils";
+import { analyzeRoom } from "@/services/roomService";
+import BackgroundLayout from "@/components/layout/BackgroundLayout";
+import HeroSection from "@/components/home/HeroSection";
+import InputSection from "@/components/home/InputSection";
+import ResultsSection from "@/components/home/ResultsSection";
+import LoadingSpinner from "@/components/home/LoadingSpinner";
+import SuggestionsSection from "@/components/home/SuggestionsSection";
 
 export default function Home() {
   const [selectedInput, setSelectedInput] = useState<InputType>("photo");
@@ -49,49 +26,12 @@ export default function Home() {
   const resultsSectionRef = useRef<HTMLDivElement>(null);
   const suggestionsLoaderRef = useRef<HTMLDivElement>(null);
 
-  const smoothScrollTo = (
-    element: HTMLElement | null,
-    duration: number = 1500
-  ) => {
-    if (!element) return;
-
-    const targetPosition =
-      element.getBoundingClientRect().top + window.pageYOffset;
-    const startPosition = window.pageYOffset;
-    const distance = targetPosition - startPosition;
-    let startTime: number | null = null;
-
-    const animation = (currentTime: number) => {
-      if (startTime === null) startTime = currentTime;
-      const timeElapsed = currentTime - startTime;
-      const progress = Math.min(timeElapsed / duration, 1);
-
-      // Easing function for smooth animation
-      const easeInOutCubic =
-        progress < 0.5
-          ? 4 * progress * progress * progress
-          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-
-      window.scrollTo(0, startPosition + distance * easeInOutCubic);
-
-      if (timeElapsed < duration) {
-        requestAnimationFrame(animation);
-      }
-    };
-
-    requestAnimationFrame(animation);
-  };
-
   const scrollToInputSection = () => {
-    smoothScrollTo(inputSectionRef.current, 1200);
+    smoothScrollTo(inputSectionRef.current, ANIMATION.SCROLL_DURATION);
   };
 
   const scrollToResults = () => {
-    smoothScrollTo(resultsSectionRef.current, 1200);
-  };
-
-  const convertBrightnessToPercentage = (brightness: number) => {
-    return (brightness / 255) * 100;
+    smoothScrollTo(resultsSectionRef.current, ANIMATION.SCROLL_DURATION);
   };
 
   const handleGenerateIdeas = async () => {
@@ -101,22 +41,8 @@ export default function Home() {
     setIsLoadingSuggestions(false);
 
     try {
-      const formData = new FormData();
-      formData.append("file", selectedInput);
-
-      const response = await fetch("http://localhost:8000/room/analyze", {
-        method: "POST",
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to analyze room");
-      }
-
-      const data: AnalysisResponse = await response.json();
+      // Call the room analysis service
+      const data = await analyzeRoom(selectedInput);
 
       setAnalysisResult(data);
 
@@ -125,9 +51,12 @@ export default function Home() {
       // Scroll to results after getting the response
       setTimeout(() => {
         scrollToResults();
-        smoothScrollTo(suggestionsLoaderRef.current, 1000);
+        smoothScrollTo(
+          suggestionsLoaderRef.current,
+          ANIMATION.SCROLL_DURATION_SHORT
+        );
         setShowSuggestions(true);
-      }, 150);
+      }, ANIMATION.SUGGESTIONS_DELAY);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       console.error("Error:", err);
@@ -137,404 +66,32 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen relative">
-      {/* Background Image */}
-      <div
-        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: "url('/background.jpeg')",
-        }}
-      ></div>
+    <BackgroundLayout>
+      <HeroSection onStartClick={scrollToInputSection} />
 
-      {/* Semi-transparent Overlay */}
-      <div className="fixed inset-0 z-10 bg-black/60 dark:bg-black/70"></div>
+      <InputSection
+        ref={inputSectionRef}
+        selectedInput={selectedInput}
+        onSelectInput={setSelectedInput}
+        isLoading={isLoading}
+        error={error}
+        onAnalyze={handleGenerateIdeas}
+      />
 
-      {/* Content */}
-      <div className="relative z-20">
-        {/* Header */}
-        <header className="container mx-auto px-4 py-6 pt-8 max-w-7xl">
-          <nav className="flex justify-between items-center">
-            <Link
-              href="/"
-              className="text-2xl font-bold text-white hover:text-gray-200 transition-colors"
-            >
-              AI Room Decor
-            </Link>
-            <div className="flex gap-8 items-center">
-              <Link
-                href="/"
-                className="text-white hover:text-gray-200 transition-colors font-medium"
-              >
-                Home
-              </Link>
-              <Link
-                href="/about"
-                className="text-white hover:text-gray-200 transition-colors font-medium"
-              >
-                About
-              </Link>
-              <Link
-                href="/contact"
-                className="text-white hover:text-gray-200 transition-colors font-medium"
-              >
-                Contact
-              </Link>
-            </div>
-          </nav>
-        </header>
+      {analysisResult && (
+        <ResultsSection
+          ref={resultsSectionRef}
+          analysisResult={analysisResult}
+        />
+      )}
 
-        {/* Hero Section */}
-        <section className="min-h-screen flex items-center justify-center px-4">
-          <div className="text-center max-w-4xl">
-            <h1 className="text-6xl md:text-7xl font-bold mb-6 text-white drop-shadow-2xl">
-              AI Room Decor
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-100 mb-12 drop-shadow-lg max-w-3xl mx-auto">
-              Transform and elevate your space with AI-powered designs.
-            </p>
-            <button
-              onClick={scrollToInputSection}
-              className="px-12 py-4 bg-white/90 text-gray-800 rounded-full font-medium text-lg shadow-lg transition-all duration-300 border-2 border-transparent hover:bg-transparent hover:text-white hover:border-white backdrop-blur-sm "
-            >
-              Start Now
-            </button>
-          </div>
-        </section>
+      {analysisResult && isLoadingSuggestions && (
+        <LoadingSpinner ref={suggestionsLoaderRef} />
+      )}
 
-        {/* Input Section */}
-        <section
-          ref={inputSectionRef}
-          className="min-h-screen flex items-center justify-center px-5"
-        >
-          <div className="container mx-auto max-w-7xl">
-            {/* Input Method Selection & Input Component */}
-            <div className="mb-8">
-              <div className="max-w-3xl mx-auto space-y-6">
-                {/* Horizontal Buttons on Top */}
-                <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={() => setSelectedInput("photo")}
-                    className={`flex items-center justify-center px-18 py-4 backdrop-blur-sm rounded-full shadow-md border-2 transition-all duration-300 ${
-                      selectedInput === "photo"
-                        ? "bg-white/90 border-transparent text-gray-700"
-                        : "bg-transparent border-white text-white hover:bg-white/90 hover:border-transparent hover:text-gray-700"
-                    }`}
-                  >
-                    <span className="font-medium text-base">📸 Photo</span>
-                  </button>
-                  <button
-                    onClick={() => setSelectedInput("voice")}
-                    className={`flex items-center justify-center px-18 py-4 backdrop-blur-sm rounded-full shadow-md border-2 transition-all duration-300 ${
-                      selectedInput === "voice"
-                        ? "bg-white/90 border-transparent text-gray-700"
-                        : "bg-transparent border-white text-white hover:bg-white/90 hover:border-transparent hover:text-gray-700"
-                    }`}
-                  >
-                    <span className="font-medium text-base">🎤 Voice</span>
-                  </button>
-                  <button
-                    onClick={() => setSelectedInput("text")}
-                    className={`flex items-center justify-center px-18 py-4 backdrop-blur-sm rounded-full shadow-md border-2 transition-all duration-300 ${
-                      selectedInput === "text"
-                        ? "bg-white/90 border-transparent text-gray-700"
-                        : "bg-transparent border-white text-white hover:bg-white/90 hover:border-transparent hover:text-gray-700"
-                    }`}
-                  >
-                    <span className="font-medium text-base">✏️ Text</span>
-                  </button>
-                </div>
-
-                {/* Input Component Below */}
-                <div>
-                  <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-2xl p-6 md:p-8 border border-gray-200 overflow-hidden">
-                    <div key={selectedInput} className="animate-fadeIn">
-                      {selectedInput === "photo" && <PhotoUpload />}
-                      {selectedInput === "voice" && <VoiceRecorder />}
-                      {selectedInput === "text" && <TextInput />}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <div className="mt-12 text-center">
-              <button
-                onClick={handleGenerateIdeas}
-                disabled={isLoading}
-                className="px-12 py-4 bg-white/90 border-2 border-transparent text-gray-800 rounded-full font-medium text-lg shadow-lg transition-all duration-300 hover:bg-transparent hover:text-white hover:border-white backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white/90 disabled:hover:text-gray-800 disabled:hover:border-transparent"
-              >
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg
-                      className="animate-spin h-5 w-5 text-gray-800"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Analyzing...
-                  </span>
-                ) : (
-                  "Analyze"
-                )}
-              </button>
-
-              {/* Error Message */}
-              {error && (
-                <div className="mt-4 p-4 bg-red-50/95 backdrop-blur-md rounded-lg border border-red-200 max-w-2xl mx-auto">
-                  <p className="text-red-800">{error}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* Results Section */}
-        {analysisResult && (
-          <section
-            ref={resultsSectionRef}
-            className="min-h-screen flex items-center justify-center px-4 py-5"
-          >
-            <div className="container mx-auto max-w-7xl">
-              <div className="max-w-5xl mx-auto">
-                <div className="bg-white/20 backdrop-blur-lg rounded-xl shadow-2xl p-6 md:p-8 border border-white/30">
-                  <h3 className="text-3xl font-bold mb-8 text-white drop-shadow-lg">
-                    Analysis Results
-                  </h3>
-
-                  <div className="space-y-6">
-                    {/* Wall Colors and Detected Styles Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Wall Colors */}
-                      <div
-                        className="rounded-xl p-6 shadow-lg"
-                        style={{
-                          backgroundImage:
-                            "linear-gradient(89.2deg, rgba(255,255,255,1) -1.3%, rgba(253,109,38,1) 281.6%)",
-                        }}
-                      >
-                        <h4 className="text-lg font-semibold mb-4 text-gray-800">
-                          Wall Colors
-                        </h4>
-                        <div className="flex flex-wrap gap-3">
-                          {analysisResult.analysis.wall_colors.map(
-                            (color) => (
-                              <div
-                                className="w-10 h-10 rounded-lg border-2 border-white shadow-md"
-                                style={{ backgroundColor: color }}
-                              ></div>
-                            )
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Style Tags */}
-                      <div
-                        className="rounded-xl p-6 shadow-lg"
-                        style={{
-                          backgroundImage:
-                            "linear-gradient(89.2deg, rgba(255,255,255,1) -1.3%, rgba(253,109,38,1) 281.6%)",
-                        }}
-                      >
-                        <h4 className="text-lg font-semibold mb-4 text-gray-800">
-                          Detected Styles
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {analysisResult.analysis.style_tags.map(
-                            (tag, index) => (
-                              <span
-                                key={index}
-                                className="px-4 py-2 bg-white/80 text-gray-800 rounded-full text-sm font-medium shadow-sm"
-                              >
-                                {tag}
-                              </span>
-                            )
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Brightness Section */}
-                    <div
-                      className="rounded-xl p-6 shadow-lg"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(89.2deg, rgba(255,255,255,1) -1.3%, rgba(253,109,38,1) 281.6%)",
-                      }}
-                    >
-                      <h4 className="text-lg font-semibold mb-4 text-gray-800">
-                        Brightness Level
-                      </h4>
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1 bg-white/50 rounded-full h-5 shadow-inner">
-                          <div
-                            className="bg-gradient-to-r from-yellow-400 to-orange-500 h-5 rounded-full transition-all shadow-md"
-                            style={{
-                              width: `${convertBrightnessToPercentage(
-                                analysisResult.analysis.brightness
-                              )}%`,
-                            }}
-                          ></div>
-                        </div>
-                        <span className="text-gray-800 font-bold text-lg min-w-[60px]">
-                          {convertBrightnessToPercentage(
-                            analysisResult.analysis.brightness
-                          ).toFixed(1)}
-                          %
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Suggestions Loader */}
-        {analysisResult && isLoadingSuggestions && (
-          <section
-            ref={suggestionsLoaderRef}
-            className="min-h-[300px] flex items-center justify-center py-5"
-          >
-            <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
-              <p className="text-white text-xl mt-6 drop-shadow-lg font-medium">
-                Loading Artwork Suggestions...
-              </p>
-            </div>
-          </section>
-        )}
-
-        {/* Suggestions Section */}
-        {analysisResult && showSuggestions && (
-          <section className="min-h-screen flex items-start justify-center py-1">
-            <div className="container mx-auto max-w-7xl px-4">
-              <div className="rounded-xl shadow-2xl p-6 md:p-8 ">
-                <h3 className="text-3xl font-bold mb-8 text-white drop-shadow-lg">
-                  Matching Suggested Artwork
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                  {analysisResult.artworks?.matching?.map((item, index) => (
-                    <a
-                      key={item.id}
-                      href={item.image_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group block bg-white rounded-2xl overflow-hidden shadow-lg transform transition-all duration-500 hover:scale-105 hover:shadow-2xl animate-fadeInUp"
-                      style={{
-                        animationDelay: `${index * 100}ms`,
-                      }}
-                    >
-                      <div
-                        className="relative h-80 bg-cover bg-center rounded-2xl"
-                        style={{
-                          backgroundImage: `url(${item.image_url})`,
-                        }}
-                      >
-                        {/* Semi-transparent overlay */}
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/30 backdrop-blur-sm p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h4 className="text-white font-semibold text-lg mb-1">
-                                {item.title} by {item.brand}
-                              </h4>
-                            </div>
-                            <div className="text-white font-bold text-lg ml-2">
-                              {item.price}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="h-10 d-block"></div>
-
-            <div className="container mx-auto max-w-7xl px-4">
-              <div className="rounded-xl shadow-2xl p-6 md:p-8 ">
-                <h3 className="text-3xl font-bold mb-8 text-white drop-shadow-lg">
-                  Contrast Suggested Artwork
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                  {analysisResult.artworks?.contrast?.map((item, index) => (
-                    <a
-                      key={item.id}
-                      href={item.image_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group block bg-white rounded-2xl overflow-hidden shadow-lg transform transition-all duration-500 hover:scale-105 hover:shadow-2xl animate-fadeInUp"
-                      style={{
-                        animationDelay: `${index * 100}ms`,
-                      }}
-                    >
-                      <div
-                        className="relative h-80 bg-cover bg-center rounded-2xl"
-                        style={{
-                          backgroundImage: `url(${item.image_url})`,
-                        }}
-                      >
-                        {/* Semi-transparent overlay */}
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/30 backdrop-blur-sm p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h4 className="text-white font-semibold text-lg mb-1">
-                                {item.title} by {item.brand}
-                              </h4>
-                            </div>
-                            <div className="text-white font-bold text-lg ml-2">
-                              {item.price}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {analysisResult && (
-          <section className="min-h-screen flex items-start justify-center py-1">
-            <div className="container mx-auto max-w-7xl px-4">
-              <div className="rounded-xl shadow-2xl p-6 md:p-8 ">
-                <h3 className="text-3xl font-bold mb-8 text-white drop-shadow-lg">
-                  Why We Suggested These Artworks
-                </h3>
-                <p className="text-white text-lg">
-                  {analysisResult.reasoning}
-                </p>
-              </div>
-            </div>
-          </section>
-        )} 
-
-        {/* Footer */}
-        <div className="py-8 text-center text-gray-200 text-sm drop-shadow-md">
-          <p>Powered by AI • Designed for your dream space</p>
-        </div>
-      </div>
-    </div>
+      {analysisResult && showSuggestions && (
+        <SuggestionsSection analysisResult={analysisResult} />
+      )}
+    </BackgroundLayout>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { formatTime } from "@/lib/utils";
+import { analyzeText } from "@/services/roomService";
 
 export default function VoiceRecorder() {
   const [isRecording, setIsRecording] = useState(false);
@@ -111,22 +113,11 @@ export default function VoiceRecorder() {
 
   const analyzeTranscript = async (text: string) => {
     try {
-      console.log("Sending transcript to Python API:", text);
+      console.log("Sending transcript to API:", text);
 
-      const response = await fetch("http://localhost:5001/api/analyze-text", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to analyze transcript");
-      }
-
-      const data = await response.json();
-      console.log("Analysis result from Python API:", data);
+      // Call the text analysis service
+      const data = await analyzeText(text);
+      console.log("Analysis result from API:", data);
 
       return data;
     } catch (error) {
@@ -157,12 +148,6 @@ export default function VoiceRecorder() {
     setRecordingTime(0);
     setTranscript("");
     setShouldAnalyze(false);
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   return (
