@@ -102,6 +102,32 @@ const ResultsSection = forwardRef(
                     </span>
                   </div>
                 </div>
+
+                {/* Objects Detected Section */}
+                {analysisResult.objects_found &&
+                  analysisResult.objects_found.length > 0 && (
+                    <div
+                      className="rounded-xl p-6 shadow-lg"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(89.2deg, rgba(255,255,255,1) -1.3%, rgba(253,109,38,1) 281.6%)",
+                      }}
+                    >
+                      <h4 className="text-lg font-semibold mb-4 text-gray-800">
+                        Objects Detected
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {analysisResult.objects_found.map((obj, index) => (
+                          <span
+                            key={index}
+                            className="px-4 py-2 bg-white/80 text-gray-800 rounded-full text-sm font-medium shadow-sm"
+                          >
+                            {obj.label} ({(obj.confidence * 100).toFixed(0)}%)
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
               </div>
             </div>
           </div>
