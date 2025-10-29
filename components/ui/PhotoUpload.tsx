@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import Image from "next/image";
+import { LIMITS } from "@/constants";
 
 export default function PhotoUpload() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -67,7 +68,9 @@ export default function PhotoUpload() {
                 className="hidden"
               />
             </div>
-            <p className="text-sm text-gray-600">PNG, JPG, GIF up to 10MB</p>
+            <p className="text-sm text-gray-600">
+              PNG, JPG, GIF up to {LIMITS.IMAGE_SIZE_MB}MB
+            </p>
           </div>
         ) : (
           <div className="space-y-4">

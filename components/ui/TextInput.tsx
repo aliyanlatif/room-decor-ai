@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { LIMITS } from "@/constants";
 
 export default function TextInput() {
   const [text, setText] = useState("");
-  const characterLimit = 500;
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value;
-    if (newText.length <= characterLimit) {
+    if (newText.length <= LIMITS.TEXT_CHARACTER_LIMIT) {
       setText(newText);
     }
   };
@@ -32,10 +32,12 @@ export default function TextInput() {
         <div className="flex justify-between items-center">
           <span
             className={`text-sm font-medium ${
-              text.length >= characterLimit ? "text-red-600" : "text-gray-600"
+              text.length >= LIMITS.TEXT_CHARACTER_LIMIT
+                ? "text-red-600"
+                : "text-gray-600"
             }`}
           >
-            {text.length} / {characterLimit} characters
+            {text.length} / {LIMITS.TEXT_CHARACTER_LIMIT} characters
           </span>
           {text.length > 0 && (
             <button
