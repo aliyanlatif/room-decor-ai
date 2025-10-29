@@ -13,6 +13,7 @@ interface InputSectionProps {
   isLoading: boolean;
   error: string | null;
   onAnalyze: () => void;
+  onFileChange?: (file: File | null) => void;
 }
 
 const InputSection = forwardRef(
@@ -23,6 +24,7 @@ const InputSection = forwardRef(
       isLoading,
       error,
       onAnalyze,
+      onFileChange,
     }: InputSectionProps,
     ref: ForwardedRef<HTMLDivElement>
   ) => {
@@ -42,7 +44,7 @@ const InputSection = forwardRef(
               <div>
                 <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-2xl p-6 md:p-8 border border-gray-200 overflow-hidden">
                   <div key={selectedInput} className="animate-fadeIn">
-                    {selectedInput === "photo" && <PhotoUpload />}
+                    {selectedInput === "photo" && <PhotoUpload onFileChange={onFileChange} />}
                     {selectedInput === "voice" && <VoiceRecorder />}
                     {selectedInput === "text" && <TextInput />}
                   </div>

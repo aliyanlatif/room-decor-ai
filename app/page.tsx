@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { InputType, AnalysisResponse } from "@/types";
 import { ANIMATION } from "@/constants";
 import { smoothScrollTo } from "@/lib/utils";
-import { analyzeRoom } from "@/services/roomService";
+import { analyzeRoom, analyzeText } from "@/services/roomService";
 import BackgroundLayout from "@/components/layout/BackgroundLayout";
 import HeroSection from "@/components/home/HeroSection";
 import InputSection from "@/components/home/InputSection";
@@ -14,6 +14,7 @@ import SuggestionsSection from "@/components/home/SuggestionsSection";
 
 export default function Home() {
   const [selectedInput, setSelectedInput] = useState<InputType>("photo");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(
     null
@@ -34,6 +35,13 @@ export default function Home() {
     smoothScrollTo(resultsSectionRef.current, ANIMATION.SCROLL_DURATION);
   };
 
+  // Clear selected file when switching away from photo input
+  useEffect(() => {
+    if (selectedInput !== "photo") {
+      setSelectedFile(null);
+    }
+  }, [selectedInput]);
+
   const handleGenerateIdeas = async () => {
     setIsLoading(true);
     setError(null);
@@ -41,8 +49,19 @@ export default function Home() {
     setIsLoadingSuggestions(false);
 
     try {
-      // Call the room analysis service
-      const data = await analyzeRoom(selectedInput);
+      let data: AnalysisResponse;
+
+      if (selectedInput === "photo") {
+        if (!selectedFile) {
+          throw new Error("Please select an image first");
+        }
+        data = await analyzeRoom(selectedFile);
+      } else {
+        // For text and voice inputs, they are handled differently
+        // VoiceRecorder handles its own analysis internally
+        // TextInput would need to expose its value - for now throw an error
+        throw new Error(`${selectedInput} input is not yet fully implemented for the Analyze button`);
+      }
 
       setAnalysisResult(data);
 
@@ -76,6 +95,7 @@ export default function Home() {
         isLoading={isLoading}
         error={error}
         onAnalyze={handleGenerateIdeas}
+        onFileChange={setSelectedFile}
       />
 
       {analysisResult && (

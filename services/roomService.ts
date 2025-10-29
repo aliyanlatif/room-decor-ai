@@ -10,20 +10,29 @@ import { API_ENDPOINTS } from "@/constants/api";
 export async function analyzeRoom(file: string | File): Promise<AnalysisResponse> {
   try {
     const formData = new FormData();
-    
-    // Handle different input types
+
     if (typeof file === "string") {
-      formData.append("file", file);
+      // Handle data URLs (base64 encoded images)
+      if (file.startsWith("data:")) {
+        // Convert data URL to blob
+        const response = await fetch(file);
+        const blob = await response.blob();
+        formData.append("file", new File([blob], "room.jpg", { type: blob.type }));
+      } else {
+        // Fetch image from the URL before sending
+        const res = await fetch(file);
+        if (!res.ok) throw new Error(`Failed to fetch image from ${file}`);
+        const blob = await res.blob();
+        formData.append("file", new File([blob], "room.jpg", { type: blob.type }));
+      }
     } else {
+      // File already valid from <input type="file">
       formData.append("file", file);
     }
 
     const response = await fetch(API_ENDPOINTS.ROOM_ANALYZE, {
       method: "POST",
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-      body: formData,
+      body: formData, // don't set Content-Type manually
     });
 
     if (!response.ok) {
@@ -33,15 +42,15 @@ export async function analyzeRoom(file: string | File): Promise<AnalysisResponse
       );
     }
 
-    const data: AnalysisResponse = await response.json();
-    return data;
+    return await response.json();
   } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("An unexpected error occurred while analyzing the room");
+    console.error("❌ analyzeRoom error:", error);
+    throw error instanceof Error
+      ? error
+      : new Error("Unexpected error while analyzing the room");
   }
 }
+
 
 /**
  * Analyzes text description for room decor suggestions

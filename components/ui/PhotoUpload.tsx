@@ -4,7 +4,11 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import { LIMITS } from "@/constants";
 
-export default function PhotoUpload() {
+interface PhotoUploadProps {
+  onFileChange?: (file: File | null) => void;
+}
+
+export default function PhotoUpload({ onFileChange }: PhotoUploadProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -18,8 +22,11 @@ export default function PhotoUpload() {
         setSelectedImage(reader.result as string);
       };
       reader.readAsDataURL(file);
+      onFileChange?.(file);
     }
   };
+
+  // No need for useEffect - we'll initialize on mount via onFileChange prop
 
   const handleRemoveImage = () => {
     setSelectedImage(null);
@@ -27,6 +34,7 @@ export default function PhotoUpload() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    onFileChange?.(null);
   };
 
   return (
